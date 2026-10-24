@@ -46,3 +46,28 @@ Painel: http://localhost:15672 (usuário `guest`, senha `guest`). Deixe a aba **
 3. Com o consumidor aberto, publique de novo em outro terminal. A mensagem chega na hora.
 
 Para pensar: `durable` (a fila sobrevive a um restart do Rabbit) e `persistent` (a mensagem sobrevive) são coisas diferentes. Teste com `docker compose restart`.
+
+## Etapa 2: API (producer)
+
+```bash
+npm run api
+```
+
+Em outro terminal, com **nenhum worker rodando**:
+
+```bash
+npm run lote -- 5
+```
+
+O script manda 5 CEPs (válidos, um inexistente e um inválido). A resposta é **202** com o id de cada CEP aceito e o motivo de cada rejeitado. Consulte um deles:
+
+```bash
+curl http://localhost:3000/cep/1
+```
+
+O status fica `pendente` e o painel mostra as mensagens **acumuladas** na fila. Sem ninguém consumindo, o trabalho não se perde: ele espera.
+
+Para pensar:
+- Por que a API grava no banco **antes** de publicar? E se a publicação falhar depois do insert?
+- Por que a mensagem leva só o id, e não os dados do CEP?
+- Por que 202 e não 200?
