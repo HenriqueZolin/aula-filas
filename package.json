@@ -1,0 +1,17 @@
+{
+  "name": "aula-filas-rabbitmq",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "publicar": "node --env-file-if-exists=.env rabbit/publicar.js",
+    "consumir": "node --env-file-if-exists=.env rabbit/consumir.js"
+  },
+  "dependencies": {
+    "amqplib": "^2.2.0",
+    "express": "^5.3.0"
+  }
+}
