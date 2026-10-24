@@ -8,6 +8,7 @@
   },
   "scripts": {
     "api": "node --env-file-if-exists=.env api.js",
+    "worker": "node --env-file-if-exists=.env worker.js",
     "lote": "node --env-file-if-exists=.env enviar-lote.js",
     "publicar": "node --env-file-if-exists=.env rabbit/publicar.js",
     "consumir": "node --env-file-if-exists=.env rabbit/consumir.js"

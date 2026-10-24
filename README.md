@@ -71,3 +71,20 @@ Para pensar:
 - Por que a API grava no banco **antes** de publicar? E se a publicação falhar depois do insert?
 - Por que a mensagem leva só o id, e não os dados do CEP?
 - Por que 202 e não 200?
+
+## Etapa 3: worker (consumer)
+
+Com a API rodando e as mensagens da etapa 2 ainda na fila:
+
+```bash
+npm run worker
+```
+
+A fila esvazia e cada CEP passa de `pendente` para `processando` e depois `concluido` (ou `erro`, para o CEP inexistente). Consulte com `GET /cep/:id`.
+
+O que observar no código:
+- **Ack manual**: a mensagem só sai da fila depois do `canal.ack`. Se o worker morrer antes, ela volta.
+- **`prefetch(1)`**: o worker pega uma mensagem por vez e só recebe a próxima depois de confirmar a atual.
+- **Pegadinha do ViaCEP**: CEP inexistente volta com HTTP 200 e `"erro": "true"` no corpo.
+
+Para pensar: o `catch` faz `nack` com requeue. O que acontece se o ViaCEP estiver fora do ar?
