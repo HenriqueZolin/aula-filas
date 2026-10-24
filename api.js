@@ -58,6 +58,14 @@ app.get('/cep/:id', (req, res) => {
     })
 })
 
+// Plano B: imita o ViaCEP se a API real bloquear a rede da sala (VIACEP_URL=http://localhost:3000)
+app.get('/ws/:cep/json', (req, res) => {
+    if (req.params.cep === '99999999') {
+        return res.json({ erro: 'true' });
+    }
+    res.json({ cep: req.params.cep, logradouro: 'Rua da Fila', bairro: 'Centro', localidade: 'Cidade da Aula', uf: 'PR' });
+})
+
 app.listen(port, () => {
     console.log(`Servidor rodando em http://localhost:${port}`)
 })

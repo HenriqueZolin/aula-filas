@@ -109,3 +109,39 @@ Dois tipos de erro no worker:
 - **Permanente** (CEP inexistente): grava `erro` e confirma com `ack`. Tentar de novo não adianta.
 
 Para pensar: na etapa 3, o `nack` devolvia a mensagem para a fila. Com o ViaCEP fora do ar, o que acontecia? E o que fazer com o que está na DLQ?
+
+## Etapa 5: vários workers e planos B
+
+### Escalar
+
+Com `DELAY_MS=3000` no `.env`:
+
+1. Desligue todos os workers e mande `npm run lote -- 30`. A fila acumula as mensagens (os CEPs `abc` são rejeitados pela API).
+2. Suba **um** worker e faça a conta: cada CEP leva 3 segundos.
+3. Suba mais dois, em outros terminais (`npm run worker`). Os logs mostram PIDs diferentes se alternando, o painel mostra 3 consumers e a fila esvazia três vezes mais rápido. A API não mudou nada.
+
+### Derrubar um worker no meio
+
+Durante a espera de um worker, aperte **Ctrl+C** nele. A mensagem que estava **Unacked** volta para **Ready** e outro worker processa. Como uma mensagem pode ser entregue mais de uma vez, o processamento precisa ser **idempotente**: atualizar o registro pelo id dá o mesmo resultado se rodar duas vezes.
+
+### Prefetch é concorrência
+
+Troque o `prefetch(1)` por `prefetch(10)` e mande 10 CEPs para um worker só. Os 10 são processados ao mesmo tempo. O prefetch é o limite de quantas mensagens cada worker processa em paralelo, e é ele que controla quantas chamadas simultâneas vão para o ViaCEP.
+
+### Plano B: ViaCEP bloqueado
+
+São 30 alunos saindo pelo mesmo IP. Se o ViaCEP bloquear a sala, use `VIACEP_URL=http://localhost:3000`: a própria API responde no mesmo formato do ViaCEP (o CEP `99999-999` continua "inexistente").
+
+### Plano B: todo mundo consumindo a fila do professor
+
+Cada aluno coloca `RABBIT_URL=amqp://usuario:senha@IP-DO-PROFESSOR` no `.env` e roda **só o worker** apontando para o banco e a API do professor, ou o `npm run consumir`, que só imprime a mensagem. Antes da aula:
+- crie um usuário no `docker-compose.yml` com `RABBITMQ_DEFAULT_USER` e `RABBITMQ_DEFAULT_PASS`, em vez de expor `guest/guest` na rede;
+- libere a porta 5672 no firewall e teste de outro computador.
+
+## Comandos úteis
+
+| Comando | O que faz |
+|---|---|
+| `docker compose stop` | Desliga o Rabbit e mantém as filas |
+| `docker compose up -d` | Liga de novo |
+| `docker compose down` | Apaga o container e as filas |
