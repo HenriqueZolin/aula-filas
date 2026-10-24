@@ -88,3 +88,24 @@ O que observar no código:
 - **Pegadinha do ViaCEP**: CEP inexistente volta com HTTP 200 e `"erro": "true"` no corpo.
 
 Para pensar: o `catch` faz `nack` com requeue. O que acontece se o ViaCEP estiver fora do ar?
+
+## Etapa 4: lentidão, erros e dead letter queue
+
+⚠️ Ao subir esta etapa, a API ou o worker vai cair com `PRECONDITION_FAILED - inequivalent arg 'x-dead-letter-exchange'`. A fila `ceps` já existe sem DLQ e o Rabbit não deixa redeclarar com outra configuração. Apague a fila `ceps` no painel (**Queues → ceps → Delete**) e suba de novo.
+
+Novas variáveis no `.env` (veja o `.env.example`):
+
+| Variável | Para quê |
+|---|---|
+| `DELAY_MS` | Espera artificial antes de chamar o ViaCEP. Com `3000`, cada CEP leva 3 segundos. |
+| `VIACEP_URL` | Base da API de CEP. Com `http://localhost:1`, toda chamada falha. |
+
+**Lentidão:** com `DELAY_MS=3000`, mande um lote e consulte um id durante a espera. O status `processando` fica visível.
+
+**Falha:** com `VIACEP_URL=http://localhost:1`, mande um lote. As mensagens vão para a fila `ceps.dlq` em vez de girar para sempre, e o status fica `erro` com o motivo. No painel, abra a `ceps.dlq` → **Get messages** e veja o header `x-death`.
+
+Dois tipos de erro no worker:
+- **Transitório** (rede, timeout, 5xx): `nack` sem requeue, a mensagem vai para a DLQ.
+- **Permanente** (CEP inexistente): grava `erro` e confirma com `ack`. Tentar de novo não adianta.
+
+Para pensar: na etapa 3, o `nack` devolvia a mensagem para a fila. Com o ViaCEP fora do ar, o que acontecia? E o que fazer com o que está na DLQ?

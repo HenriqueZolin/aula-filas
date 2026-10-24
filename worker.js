@@ -1,5 +1,9 @@
+import { setTimeout } from 'node:timers/promises'
 import { buscarCep, atualizarCep } from './db.js'
 import { conectar, FILA_CEPS } from './rabbit/rabbit.js'
+
+const DELAY_MS = Number(process.env.DELAY_MS ?? 0);
+const VIACEP_URL = process.env.VIACEP_URL ?? 'https://viacep.com.br';
 
 const { canal } = await conectar();
 
@@ -21,11 +25,22 @@ const handler = async (msg) => {
 
         atualizarCep(id, 'processando');
 
-        const resp = await fetch(`https://viacep.com.br/ws/${registro.cep}/json/`,
+        await setTimeout(DELAY_MS);
+        const resp = await fetch(`${VIACEP_URL}/ws/${registro.cep}/json/`,
             { signal: AbortSignal.timeout(5000) }
         );
+
+        // Erro transitório: a API externa falhou. Tentar de novo pode resolver, então vai para a DLQ.
+        if (!resp.ok) {
+            console.log(`[PID ${process.pid}] ViaCEP respondeu ${resp.status}`);
+            atualizarCep(id, 'erro', null, `ViaCEP respondeu ${resp.status}`);
+            canal.nack(msg, false, false);
+            return;
+        }
+
         const dados = await resp.json();
 
+        // Erro permanente: o CEP não existe. Tentar de novo não adianta, então confirma.
         if (dados.erro) {
             atualizarCep(id, 'erro', null, 'CEP não encontrado');
         } else {
@@ -34,8 +49,8 @@ const handler = async (msg) => {
         canal.ack(msg);
     } catch (error) {
         console.error(`[PID ${process.pid}] falhou id ${id}:`, error.message);
-        // Devolve a mensagem para a fila. Na etapa 4 vamos ver o problema disso.
-        canal.nack(msg);
+        atualizarCep(id, 'erro', null, error.message);
+        canal.nack(msg, false, false);
     }
 }
 
